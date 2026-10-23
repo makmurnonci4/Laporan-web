@@ -87,7 +87,6 @@
 <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-sm px-4 py-2 rounded-xl hidden max-w-[90%] text-center"></div>
 
 <script>
-const LINK_WA = "https://makmurnonci4.github.io/Laporan-web/";
 const MAX = 4;      // dokumen
 const MAXF = 6;     // foto
 const S = { foto: [], dok: [] };
@@ -229,7 +228,7 @@ $('btnKirim').onclick = async () => {
 
   const daftarDok = S.dok.map((d, i) => `${i + 1}. ${d.name || 'Dokumen ' + (i + 1)}`).join('\n');
   const tgl = fmtTgl();
-  const teks = `*${judul}*\n${tgl ? '📅 ' + tgl + '\n' : ''}Laporan kegiatan: ${S.foto.length} foto, ${S.dok.length} dokumen.` + (daftarDok ? `\n\nDokumen:\n${daftarDok}` : '') + `\n\nLink: ${LINK_WA}`;
+  const teks = `*${judul}*\n${tgl ? '📅 ' + tgl + '\n' : ''}Laporan kegiatan: ${S.foto.length} foto, ${S.dok.length} dokumen.` + (daftarDok ? `\n\nDokumen:\n${daftarDok}` : '') ;
 
   const files = [
     ...S.foto.map((p, i) => new File([p.file], `${(p.cap || 'foto ' + (i + 1)).trim()}${ext(p.file) || '.jpg'}`, { type: p.file.type })),

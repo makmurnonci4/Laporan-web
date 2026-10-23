@@ -44,7 +44,7 @@
     <!-- FOTO -->
     <section class="space-y-3">
       <div class="flex items-center justify-between">
-        <h3 class="text-xs font-bold text-slate-400">📸 Foto Kegiatan <span id="cFoto">(0/4)</span></h3>
+        <h3 class="text-xs font-bold text-slate-400">📸 Foto Kegiatan <span id="cFoto">(0/6)</span></h3>
         <button id="btnFoto" class="text-xs font-semibold accent-bg hover:brightness-110 px-3 py-1.5 rounded-lg">+ Tambah Foto/PDF</button>
       </div>
       <input id="inFoto" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple class="hidden">
@@ -79,7 +79,8 @@
 <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-sm px-4 py-2 rounded-xl hidden max-w-[90%] text-center"></div>
 
 <script>
-const MAX = 4;
+const MAX = 4;      // dokumen
+const MAXF = 6;     // foto
 const S = { foto: [], dok: [] };
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -109,12 +110,12 @@ function lihat(item) {
 
 /* ---------- FOTO ---------- */
 function renderFoto() {
-  $('cFoto').textContent = `(${S.foto.length}/${MAX})`;
-  $('btnFoto').disabled = S.foto.length >= MAX;
-  $('btnFoto').classList.toggle('opacity-40', S.foto.length >= MAX);
+  $('cFoto').textContent = `(${S.foto.length}/${MAXF})`;
+  $('btnFoto').disabled = S.foto.length >= MAXF;
+  $('btnFoto').classList.toggle('opacity-40', S.foto.length >= MAXF);
   const g = $('gridFoto'); g.innerHTML = '';
   if (!S.foto.length) {
-    g.innerHTML = '<div class="col-span-2 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-8">Belum ada foto. Ketuk “Tambah Foto/PDF” (1–4 file, format JPG, PNG, atau PDF).</div>';
+    g.innerHTML = '<div class="col-span-2 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-8">Belum ada foto. Ketuk “Tambah Foto/PDF” (1–6 file, format JPG, PNG, atau PDF).</div>';
     return;
   }
   S.foto.forEach((p, i) => {
@@ -142,7 +143,7 @@ $('btnFoto').onclick = () => $('inFoto').click();
 $('inFoto').onchange = e => {
   for (const f of e.target.files) {
     if (!['.jpg', '.jpeg', '.png', '.pdf'].includes(ext(f))) { toast(f.name + ': hanya JPG, PNG, atau PDF.'); continue; }
-    if (S.foto.length >= MAX) { toast('Maksimal 4 foto.'); break; }
+    if (S.foto.length >= MAXF) { toast('Maksimal 6 foto.'); break; }
     S.foto.push({ file: f, url: URL.createObjectURL(f), cap: 'Kegiatan ' + (S.foto.length + 1) });
   }
   e.target.value = ''; renderFoto();

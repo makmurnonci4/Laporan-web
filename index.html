@@ -386,6 +386,16 @@ function siapkanSampul() {
   }, 250);
 }
 const DI_HP = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+// Saat cetak di komputer: dokumen langsung dibuka (PDF/gambar di tab baru, Word/Excel diunduh)
+function bukaDokSemua() {
+  let gagal = 0;
+  S.dok.forEach(d => {
+    const e = ext(d.file);
+    if (e === '.pdf' || d.file.type.startsWith('image/')) { if (!window.open(d.url, '_blank')) gagal++; }
+    else { const a = document.createElement('a'); a.href = d.url; a.download = (d.name || baseName(d.file)) + e; a.click(); }
+  });
+  if (gagal) toast('Browser memblokir tab baru. Izinkan pop-up untuk halaman ini, atau ketuk tombol “Buka” pada dokumen.');
+}
 function cetakLembar(f) {
   const url = URL.createObjectURL(f);
   const fr = document.createElement('iframe');
@@ -400,8 +410,8 @@ function cetakLembar(f) {
   toast('Membuka jendela cetak (kertas A4).');
 }
 if (!DI_HP) {
-  $('btnKirim').textContent = '🖨️ Cetak Lembar (A4)';
-  $('btnKirim').nextElementSibling.textContent = 'Di komputer, lembar foto langsung dicetak satu kertas A4. Daftar dokumen ikut tercetak di bagian bawah lembar.';
+  $('btnKirim').textContent = '🖨️ Cetak Lembar + Buka Dokumen';
+  $('btnKirim').nextElementSibling.textContent = 'Di komputer, dokumen langsung terbuka (PDF/gambar di tab baru, Word/Excel terunduh), lalu lembar foto dicetak di satu kertas A4. Jika tab diblokir, izinkan pop-up.';
 }
 $('pratinjau').onclick = bukaPratinjau;
 
@@ -416,7 +426,12 @@ $('btnKirim').onclick = async () => {
   const arg = argLembar();
   const lembar = (S.lembar && S.lembarKey === kunciLembar(arg)) ? S.lembar : await buatLembar(...arg);
   const fDok = S.dok.map((d, i) => bikinFile(d.file, (d.name || 'dokumen ' + (i + 1)).trim(), ''));
-  if (!DI_HP) { cetakLembar(lembar); S.pendingDok = []; tampilTerkirim(); return; }
+  if (!DI_HP) {
+    S.pendingDok = [];
+    if (S.dok.length) { bukaDokSemua(); setTimeout(() => { window.focus(); cetakLembar(lembar); }, 800); }
+    else cetakLembar(lembar);
+    tampilTerkirim(); return;
+  }
   const bisa = f => navigator.canShare && navigator.canShare({ files: f });
 
   // Lembar + sebanyak mungkin dokumen dalam satu kiriman; sisanya dikirim terpisah

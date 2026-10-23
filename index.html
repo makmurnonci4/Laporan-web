@@ -45,9 +45,9 @@
     <section class="space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="text-xs font-bold text-slate-400">📸 Foto Kegiatan <span id="cFoto">(0/4)</span></h3>
-        <button id="btnFoto" class="text-xs font-semibold accent-bg hover:brightness-110 px-3 py-1.5 rounded-lg">+ Tambah Foto</button>
+        <button id="btnFoto" class="text-xs font-semibold accent-bg hover:brightness-110 px-3 py-1.5 rounded-lg">+ Tambah Foto/PDF</button>
       </div>
-      <input id="inFoto" type="file" accept="image/*" multiple class="hidden">
+      <input id="inFoto" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple class="hidden">
       <div id="gridFoto" class="grid grid-cols-2 gap-2"></div>
     </section>
 
@@ -57,7 +57,7 @@
         <h3 class="text-xs font-bold text-slate-400">📁 Dokumen & Lampiran <span id="cDok">(0/4)</span></h3>
         <button id="btnDok" class="text-xs font-semibold accent-bg hover:brightness-110 px-3 py-1.5 rounded-lg">+ Tambah Dokumen</button>
       </div>
-      <input id="inDok" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*" multiple class="hidden">
+      <input id="inDok" type="file" accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple class="hidden">
       <div id="listDok" class="space-y-2"></div>
     </section>
 
@@ -90,6 +90,7 @@ function toast(msg) {
 }
 const ext = f => (f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
 const baseName = f => f.name.replace(/\.[^.]+$/, '');
+const isPdf = f => f.type === 'application/pdf' || ext(f) === '.pdf';
 function ikon(f) {
   const e = ext(f);
   if (e === '.pdf') return '📄';
@@ -113,14 +114,16 @@ function renderFoto() {
   $('btnFoto').classList.toggle('opacity-40', S.foto.length >= MAX);
   const g = $('gridFoto'); g.innerHTML = '';
   if (!S.foto.length) {
-    g.innerHTML = '<div class="col-span-2 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-8">Belum ada foto. Ketuk “Tambah Foto” (1–4 foto).</div>';
+    g.innerHTML = '<div class="col-span-2 text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-8">Belum ada foto. Ketuk “Tambah Foto/PDF” (1–4 file, format JPG, PNG, atau PDF).</div>';
     return;
   }
   S.foto.forEach((p, i) => {
     const d = document.createElement('div');
     d.className = 'relative rounded-xl overflow-hidden border border-slate-700 bg-slate-800';
     d.innerHTML = `
-      <button class="block w-full aspect-video" data-v="${i}"><img src="${p.url}" alt="" class="w-full h-full object-cover"></button>
+      <button class="block w-full aspect-video" data-v="${i}">${isPdf(p.file)
+        ? `<div class="w-full h-full flex flex-col items-center justify-center gap-1 bg-slate-800"><span class="text-3xl">📄</span><span class="text-[10px] text-slate-300 px-2 truncate max-w-full">${esc(p.file.name)}</span></div>`
+        : `<img src="${p.url}" alt="" class="w-full h-full object-cover">`}</button>
       <button data-x="${i}" class="absolute top-1 right-1 bg-black/70 hover:bg-red-600 rounded-full w-6 h-6 text-xs" aria-label="Hapus foto">✕</button>
       <input data-c="${i}" value="${esc(p.cap)}" maxlength="40" placeholder="Nama kegiatan"
         class="w-full bg-black/60 text-[11px] text-center text-slate-200 p-1.5 outline-none focus:bg-black">`;
@@ -138,6 +141,7 @@ $('gridFoto').addEventListener('input', e => {
 $('btnFoto').onclick = () => $('inFoto').click();
 $('inFoto').onchange = e => {
   for (const f of e.target.files) {
+    if (!['.jpg', '.jpeg', '.png', '.pdf'].includes(ext(f))) { toast(f.name + ': hanya JPG, PNG, atau PDF.'); continue; }
     if (S.foto.length >= MAX) { toast('Maksimal 4 foto.'); break; }
     S.foto.push({ file: f, url: URL.createObjectURL(f), cap: 'Kegiatan ' + (S.foto.length + 1) });
   }
@@ -151,7 +155,7 @@ function renderDok() {
   $('btnDok').classList.toggle('opacity-40', S.dok.length >= MAX);
   const l = $('listDok'); l.innerHTML = '';
   if (!S.dok.length) {
-    l.innerHTML = '<div class="text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-6">Belum ada dokumen. Ketuk “Tambah Dokumen” (maks. 4).</div>';
+    l.innerHTML = '<div class="text-center text-xs text-slate-500 border border-dashed border-slate-700 rounded-xl py-6">Belum ada dokumen. Ketuk “Tambah Dokumen” (maks. 4; Word, Excel, PDF, JPG, atau PNG).</div>';
     return;
   }
   S.dok.forEach((d, i) => {
@@ -179,6 +183,7 @@ $('listDok').addEventListener('input', e => {
 $('btnDok').onclick = () => $('inDok').click();
 $('inDok').onchange = e => {
   for (const f of e.target.files) {
+    if (!['.doc', '.docx', '.xls', '.xlsx', '.pdf', '.jpg', '.jpeg', '.png'].includes(ext(f))) { toast(f.name + ': hanya Word, Excel, PDF, JPG, atau PNG.'); continue; }
     if (S.dok.length >= MAX) { toast('Maksimal 4 dokumen.'); break; }
     S.dok.push({ file: f, url: URL.createObjectURL(f), name: baseName(f) });
   }

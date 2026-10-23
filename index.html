@@ -71,6 +71,7 @@
     <section id="boxPratinjau" class="hidden space-y-2">
       <h3 class="text-xs font-bold text-slate-400">📄 Pratinjau Satu Lembar (ketuk untuk perbesar)</h3>
       <img id="pratinjau" alt="Pratinjau lembar" class="w-full rounded-xl border border-slate-700 bg-white cursor-pointer">
+      <div id="bukaDok" class="space-y-2"></div>
     </section>
 
     <!-- SETELAH KIRIM -->
@@ -346,8 +347,31 @@ const argLembar = () => [
   S.dok.map((d, i) => d.name || 'Dokumen ' + (i + 1)), S.foto.map(p => ({ url: p.url, cap: p.cap || '' }))
 ];
 const kunciLembar = arg => JSON.stringify(arg) + getComputedStyle(document.documentElement).getPropertyValue('--c1');
+function renderBukaDok() {
+  const b = $('bukaDok'); b.innerHTML = '';
+  if (!S.dok.length) return;
+  b.innerHTML = '<p class="text-[11px] text-slate-400 pt-1">📁 Dokumen — ketuk untuk membuka:</p>';
+  S.dok.forEach((d, i) => {
+    const t = document.createElement('button');
+    t.className = 'w-full flex items-center justify-between p-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-left';
+    t.innerHTML = `<span class="text-xs font-bold truncate">${ikon(d.file)} ${esc(d.name || 'Dokumen ' + (i + 1))}</span><span class="text-xs text-blue-400 ml-2">Buka</span>`;
+    t.onclick = () => lihat(d);
+    b.appendChild(t);
+  });
+}
+function bukaPratinjau() {
+  if (!S.pUrl) return;
+  const links = S.dok.map((d, i) => {
+    const nama = (d.name || 'Dokumen ' + (i + 1)), e = ext(d.file);
+    const buka = e === '.pdf' || d.file.type.startsWith('image/');
+    return `<a href="${d.url}" ${buka ? 'target="_blank"' : `download="${esc(nama + e)}"`}>${ikon(d.file)} ${esc(nama)}</a>`;
+  }).join('');
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lembar Kegiatan</title><style>body{margin:0;background:#e2e8f0;font-family:system-ui,sans-serif}.w{max-width:820px;margin:0 auto;padding:12px}img{width:100%;display:block;background:#fff;box-shadow:0 2px 12px #0003}.d{margin-top:12px;display:grid;gap:8px}a{display:block;background:#fff;border:1px solid #94a3b8;border-radius:10px;padding:12px;color:#1d4ed8;font-weight:700;text-decoration:none}@media print{.d{display:none}body{background:#fff}.w{padding:0;max-width:none}img{box-shadow:none}}</style></head><body><div class="w"><img src="${S.pUrl}">${links ? '<div class="d"><b>📁 Dokumen — ketuk untuk membuka:</b>' + links + '</div>' : ''}</div></body></html>`;
+  window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+}
 function siapkanSampul() {
   clearTimeout(sampulTimer);
+  renderBukaDok();
   if (!S.foto.length && !S.dok.length) { $('boxPratinjau').classList.add('hidden'); return; }
   sampulTimer = setTimeout(async () => {
     const seq = ++lembarSeq, arg = argLembar(), key = kunciLembar(arg);
@@ -379,7 +403,7 @@ if (!DI_HP) {
   $('btnKirim').textContent = '🖨️ Cetak Lembar (A4)';
   $('btnKirim').nextElementSibling.textContent = 'Di komputer, lembar foto langsung dicetak satu kertas A4. Daftar dokumen ikut tercetak di bagian bawah lembar.';
 }
-$('pratinjau').onclick = () => { if (S.pUrl) window.open(S.pUrl, '_blank'); };
+$('pratinjau').onclick = bukaPratinjau;
 
 $('btnKirim').onclick = async () => {
   const judul = $('judul').value.trim() || 'Laporan Kegiatan';

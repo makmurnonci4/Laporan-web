@@ -75,7 +75,7 @@
 
     <!-- SETELAH KIRIM -->
     <section id="terkirim" class="hidden space-y-3 bg-emerald-950/40 border border-emerald-800 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-emerald-300">✅ Terkirim — lihat dokumen</h3>
+      <h3 id="judulTerkirim" class="text-xs font-bold text-emerald-300">✅ Terkirim — lihat dokumen</h3>
       <div id="listLihat" class="space-y-2"></div>
       <div id="kirimUlang" class="hidden space-y-2 pt-1">
         <p class="text-[11px] text-amber-300">Sebagian dokumen belum bisa ikut terkirim bersama lembar foto. Ketuk tombol di bawah untuk mengirimnya ke WhatsApp.</p>
@@ -243,6 +243,7 @@ $('inDokGaleri').onchange = $('inDok').onchange = async e => {
 
 /* ---------- KIRIM WA ---------- */
 function tampilTerkirim() {
+  $('judulTerkirim').textContent = DI_HP ? '✅ Terkirim — lihat dokumen' : '🖨️ Hasil cetak — buka dokumen untuk dilihat/dicetak';
   const box = $('listLihat'); box.innerHTML = '';
   if (!S.dok.length) { box.innerHTML = '<p class="text-xs text-slate-400">Tidak ada dokumen.</p>'; }
   S.dok.forEach((d, i) => {
@@ -391,7 +392,7 @@ $('btnKirim').onclick = async () => {
   const arg = argLembar();
   const lembar = (S.lembar && S.lembarKey === kunciLembar(arg)) ? S.lembar : await buatLembar(...arg);
   const fDok = S.dok.map((d, i) => bikinFile(d.file, (d.name || 'dokumen ' + (i + 1)).trim(), ''));
-  if (!DI_HP) { cetakLembar(lembar); return; }
+  if (!DI_HP) { cetakLembar(lembar); S.pendingDok = []; tampilTerkirim(); return; }
   const bisa = f => navigator.canShare && navigator.canShare({ files: f });
 
   // Lembar + sebanyak mungkin dokumen dalam satu kiriman; sisanya dikirim terpisah

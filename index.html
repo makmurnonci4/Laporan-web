@@ -73,6 +73,10 @@
     <section id="terkirim" class="hidden space-y-3 bg-emerald-950/40 border border-emerald-800 rounded-2xl p-4">
       <h3 class="text-xs font-bold text-emerald-300">✅ Terkirim — lihat dokumen</h3>
       <div id="listLihat" class="space-y-2"></div>
+      <div id="kirimUlang" class="hidden space-y-2 pt-1">
+        <p class="text-[11px] text-amber-300">Dokumen belum bisa ikut terkirim bersama foto. Ketuk tombol di bawah untuk mengirim dokumen ke WhatsApp.</p>
+        <button id="btnKirimDok" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 rounded-xl">📤 Kirim Dokumen ke WhatsApp</button>
+      </div>
     </section>
   </div>
 
@@ -99,6 +103,19 @@ function toast(msg) {
 }
 const ext = f => (f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
 const baseName = f => f.name.replace(/\.[^.]+$/, '');
+const MIME = {
+  '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+};
+// Pastikan setiap file punya tipe MIME yang benar (tipe kosong membuat share ditolak)
+function bikinFile(file, nama, extCadangan) {
+  const e = ext(file) || extCadangan || '';
+  const type = file.type || MIME[e] || 'application/octet-stream';
+  return new File([file], nama + e, { type });
+}
 const isPdf = f => f.type === 'application/pdf' || ext(f) === '.pdf';
 function ikon(f) {
   const e = ext(f);
@@ -218,6 +235,7 @@ function tampilTerkirim() {
     b.onclick = () => lihat(d);
     box.appendChild(b);
   });
+  $('kirimUlang').classList.toggle('hidden', !(S.pendingDok && S.pendingDok.length));
   $('terkirim').classList.remove('hidden');
   $('terkirim').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -284,21 +302,29 @@ $('btnKirim').onclick = async () => {
   const teks = `*${judul}*\n${tgl ? '📅 ' + tgl + '\n' : ''}Laporan kegiatan: ${S.foto.length} foto, ${S.dok.length} dokumen.` + (daftarDok ? `\n\nDokumen:\n${daftarDok}` : '') ;
 
   const sampul = await buatSampul(judul, tgl, S.dok.map((d, i) => d.name || 'Dokumen ' + (i + 1)), S.foto.length);
-  const files = [
+  const fFoto = [
     sampul,
-    ...S.foto.map((p, i) => new File([p.file], `${(p.cap || 'foto ' + (i + 1)).trim()}${ext(p.file) || '.jpg'}`, { type: p.file.type })),
-    ...S.dok.map((d, i) => new File([d.file], `${(d.name || 'dokumen ' + (i + 1)).trim()}${ext(d.file)}`, { type: d.file.type }))
+    ...S.foto.map((p, i) => bikinFile(p.file, (p.cap || 'foto ' + (i + 1)).trim(), '.jpg'))
   ];
+  const fDok = S.dok.map((d, i) => bikinFile(d.file, (d.name || 'dokumen ' + (i + 1)).trim(), ''));
+  const semua = [...fFoto, ...fDok];
+  S.pendingDok = [];
 
-  // Salin teks laporan ke clipboard (WhatsApp sering membuang file jika teks ikut dibagikan)
+  // Salin teks laporan ke clipboard (cadangan, bisa ditempel di chat)
   let tersalin = true;
   try { navigator.clipboard.writeText(teks).catch(() => { tersalin = false; }); } catch (_) { tersalin = false; }
 
+  const bisa = f => navigator.canShare && navigator.canShare({ files: f });
   try {
-    if (navigator.canShare && navigator.canShare({ files })) {
-      // Bagikan FILE SAJA (tanpa text/title). Nama, tanggal & daftar dokumen ada di gambar sampul (file pertama)
-      await navigator.share({ files });
+    if (bisa(semua)) {
+      // Semua file sekaligus (tanpa text/title). Nama, tanggal & daftar dokumen ada di gambar sampul.
+      await navigator.share({ files: semua });
       toast(tersalin ? 'Terkirim. Teks laporan juga disalin, bisa ditempel (paste) di chat.' : 'Terkirim.');
+    } else if (bisa(fFoto)) {
+      // Peramban menolak jenis dokumen tertentu -> kirim foto dulu, dokumen dikirim terpisah
+      S.pendingDok = fDok;
+      await navigator.share({ files: fFoto });
+      toast('Foto terkirim. Sekarang kirim dokumennya lewat tombol hijau di bawah.');
     } else {
       window.open('https://wa.me/?text=' + encodeURIComponent(teks), '_blank');
       toast('Perangkat ini tidak bisa kirim file langsung. Lampirkan file secara manual di WhatsApp.');
@@ -306,6 +332,25 @@ $('btnKirim').onclick = async () => {
     tampilTerkirim();
   } catch (err) {
     if (err.name !== 'AbortError') toast('Gagal membagikan: ' + err.message);
+  }
+};
+
+// Kirim dokumen satu per satu bila tidak bisa digabung dengan foto
+$('btnKirimDok').onclick = async () => {
+  const sisa = S.pendingDok || [];
+  if (!sisa.length) return;
+  const f = sisa[0];
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [f] })) {
+      await navigator.share({ files: [f] });
+    } else {
+      // Tidak didukung peramban: unduh agar bisa dilampirkan manual di WhatsApp
+      const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+      toast(f.name + ' diunduh. Lampirkan manual di WhatsApp.');
+    }
+    S.pendingDok.shift(); tampilTerkirim();
+  } catch (err) {
+    if (err.name !== 'AbortError') toast('Gagal: ' + err.message);
   }
 };
 

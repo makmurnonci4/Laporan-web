@@ -116,6 +116,16 @@ function bikinFile(file, nama, extCadangan) {
   const type = file.type || MIME[e] || 'application/octet-stream';
   return new File([file], nama + e, { type });
 }
+// Salin isi file ke memori saat dipilih, supaya izin akses file tidak hilang saat dikirim
+async function salinKeMemori(f) {
+  try {
+    const buf = await f.arrayBuffer();
+    return new File([buf], f.name, { type: f.type || MIME[ext(f)] || 'application/octet-stream' });
+  } catch (err) {
+    toast(f.name + ': file tidak bisa dibaca (' + err.message + '). Pilih ulang dari penyimpanan HP.');
+    return null;
+  }
+}
 const isPdf = f => f.type === 'application/pdf' || ext(f) === '.pdf';
 function ikon(f) {
   const e = ext(f);
@@ -135,6 +145,7 @@ function lihat(item) {
 
 /* ---------- FOTO ---------- */
 function renderFoto() {
+  siapkanSampul();
   $('cFoto').textContent = `(${S.foto.length}/${MAXF})`;
   ['btnGaleri', 'btnFoto'].forEach(id => {
     $(id).disabled = S.foto.length >= MAXF;
@@ -168,18 +179,21 @@ $('gridFoto').addEventListener('input', e => {
 });
 $('btnGaleri').onclick = () => $('inGaleri').click();
 $('btnFoto').onclick = () => $('inFoto').click();
-$('inGaleri').onchange = $('inFoto').onchange = e => {
-  for (const f of e.target.files) {
-    const ok = ['.jpg', '.jpeg', '.png', '.pdf'].includes(ext(f)) || ['image/jpeg', 'image/png', 'application/pdf'].includes(f.type);
-    if (!ok) { toast(f.name + ': hanya JPG, PNG, atau PDF.'); continue; }
+$('inGaleri').onchange = $('inFoto').onchange = async e => {
+  const daftar = Array.from(e.target.files); e.target.value = '';
+  for (const f0 of daftar) {
+    const ok = ['.jpg', '.jpeg', '.png', '.pdf'].includes(ext(f0)) || ['image/jpeg', 'image/png', 'application/pdf'].includes(f0.type);
+    if (!ok) { toast(f0.name + ': hanya JPG, PNG, atau PDF.'); continue; }
     if (S.foto.length >= MAXF) { toast('Maksimal 6 foto.'); break; }
+    const f = await salinKeMemori(f0); if (!f) continue;
     S.foto.push({ file: f, url: URL.createObjectURL(f), cap: 'Kegiatan ' + (S.foto.length + 1) });
   }
-  e.target.value = ''; renderFoto();
+  renderFoto();
 };
 
 /* ---------- DOKUMEN ---------- */
 function renderDok() {
+  siapkanSampul();
   $('cDok').textContent = `(${S.dok.length}/${MAX})`;
   ['btnDokGaleri', 'btnDok'].forEach(id => {
     $(id).disabled = S.dok.length >= MAX;
@@ -214,14 +228,16 @@ $('listDok').addEventListener('input', e => {
 });
 $('btnDokGaleri').onclick = () => $('inDokGaleri').click();
 $('btnDok').onclick = () => $('inDok').click();
-$('inDokGaleri').onchange = $('inDok').onchange = e => {
-  for (const f of e.target.files) {
-    const ok = ['.doc', '.docx', '.xls', '.xlsx', '.pdf', '.jpg', '.jpeg', '.png'].includes(ext(f)) || ['image/jpeg', 'image/png', 'application/pdf'].includes(f.type);
-    if (!ok) { toast(f.name + ': hanya Word, Excel, PDF, JPG, atau PNG.'); continue; }
+$('inDokGaleri').onchange = $('inDok').onchange = async e => {
+  const daftar = Array.from(e.target.files); e.target.value = '';
+  for (const f0 of daftar) {
+    const ok = ['.doc', '.docx', '.xls', '.xlsx', '.pdf', '.jpg', '.jpeg', '.png'].includes(ext(f0)) || ['image/jpeg', 'image/png', 'application/pdf'].includes(f0.type);
+    if (!ok) { toast(f0.name + ': hanya Word, Excel, PDF, JPG, atau PNG.'); continue; }
     if (S.dok.length >= MAX) { toast('Maksimal 4 dokumen.'); break; }
+    const f = await salinKeMemori(f0); if (!f) continue;
     S.dok.push({ file: f, url: URL.createObjectURL(f), name: baseName(f) });
   }
-  e.target.value = ''; renderDok();
+  renderDok();
 };
 
 /* ---------- KIRIM WA ---------- */
@@ -293,6 +309,20 @@ function buatSampul(judul, tgl, dokNama, nFoto) {
   return new Promise(res => c.toBlob(bl => res(new File([bl], '00-Laporan.png', { type: 'image/png' })), 'image/png'));
 }
 
+/* Sampul disiapkan lebih dulu agar tombol kirim langsung membuka share (izin browser hilang jika menunggu) */
+let sampulTimer;
+const argSampul = () => [
+  $('judul').value.trim() || 'Laporan Kegiatan', fmtTgl(),
+  S.dok.map((d, i) => d.name || 'Dokumen ' + (i + 1)), S.foto.length
+];
+function siapkanSampul() {
+  clearTimeout(sampulTimer);
+  sampulTimer = setTimeout(async () => {
+    const arg = argSampul(), key = JSON.stringify(arg) + getComputedStyle(document.documentElement).getPropertyValue('--c1');
+    try { S.sampul = await buatSampul(...arg); S.sampulKey = key; } catch (_) {}
+  }, 250);
+}
+
 $('btnKirim').onclick = async () => {
   const judul = $('judul').value.trim() || 'Laporan Kegiatan';
   if (!S.foto.length && !S.dok.length) { toast('Tambahkan minimal 1 foto atau dokumen dulu.'); return; }
@@ -301,7 +331,8 @@ $('btnKirim').onclick = async () => {
   const tgl = fmtTgl();
   const teks = `*${judul}*\n${tgl ? '📅 ' + tgl + '\n' : ''}Laporan kegiatan: ${S.foto.length} foto, ${S.dok.length} dokumen.` + (daftarDok ? `\n\nDokumen:\n${daftarDok}` : '') ;
 
-  const sampul = await buatSampul(judul, tgl, S.dok.map((d, i) => d.name || 'Dokumen ' + (i + 1)), S.foto.length);
+  const key = JSON.stringify(argSampul()) + getComputedStyle(document.documentElement).getPropertyValue('--c1');
+  const sampul = (S.sampul && S.sampulKey === key) ? S.sampul : await buatSampul(...argSampul());
   const fFoto = [
     sampul,
     ...S.foto.map((p, i) => bikinFile(p.file, (p.cap || 'foto ' + (i + 1)).trim(), '.jpg'))
@@ -310,20 +341,21 @@ $('btnKirim').onclick = async () => {
   const semua = [...fFoto, ...fDok];
   S.pendingDok = [];
 
-  // Salin teks laporan ke clipboard (cadangan, bisa ditempel di chat)
-  let tersalin = true;
-  try { navigator.clipboard.writeText(teks).catch(() => { tersalin = false; }); } catch (_) { tersalin = false; }
+  let tersalin = false;
+  const salinTeks = async () => { try { await navigator.clipboard.writeText(teks); tersalin = true; } catch (_) {} };
 
   const bisa = f => navigator.canShare && navigator.canShare({ files: f });
   try {
     if (bisa(semua)) {
       // Semua file sekaligus (tanpa text/title). Nama, tanggal & daftar dokumen ada di gambar sampul.
       await navigator.share({ files: semua });
+      await salinTeks();
       toast(tersalin ? 'Terkirim. Teks laporan juga disalin, bisa ditempel (paste) di chat.' : 'Terkirim.');
     } else if (bisa(fFoto)) {
       // Peramban menolak jenis dokumen tertentu -> kirim foto dulu, dokumen dikirim terpisah
       S.pendingDok = fDok;
       await navigator.share({ files: fFoto });
+      await salinTeks();
       toast('Foto terkirim. Sekarang kirim dokumennya lewat tombol hijau di bawah.');
     } else {
       window.open('https://wa.me/?text=' + encodeURIComponent(teks), '_blank');
@@ -331,7 +363,9 @@ $('btnKirim').onclick = async () => {
     }
     tampilTerkirim();
   } catch (err) {
-    if (err.name !== 'AbortError') toast('Gagal membagikan: ' + err.message);
+    if (err.name === 'AbortError') return;
+    if (err.name === 'NotAllowedError') toast('Izin ditolak browser. Ketuk tombol kirim sekali lagi (jangan menunggu lama), dan pastikan memakai Chrome/Safari bukan browser dalam aplikasi.');
+    else toast('Gagal membagikan: ' + err.message);
   }
 };
 
@@ -350,7 +384,7 @@ $('btnKirimDok').onclick = async () => {
     }
     S.pendingDok.shift(); tampilTerkirim();
   } catch (err) {
-    if (err.name !== 'AbortError') toast('Gagal: ' + err.message);
+    if (err.name !== 'AbortError') toast(err.name === 'NotAllowedError' ? 'Izin ditolak browser. Ketuk tombol sekali lagi.' : 'Gagal: ' + err.message);
   }
 };
 
@@ -370,7 +404,7 @@ function setWarna(c1, c2) {
   const r = document.documentElement.style;
   r.setProperty('--c1', c1); r.setProperty('--c2', c2);
   r.setProperty('--ht', lum(c1) > 0.6 ? '#0f172a' : '#ffffff');
-  cfg.c1 = c1; cfg.c2 = c2; simpan();
+  cfg.c1 = c1; cfg.c2 = c2; simpan(); siapkanSampul();
 }
 PRESET.forEach(([a, b, nama]) => {
   const t = document.createElement('button');
@@ -398,7 +432,7 @@ function updTgl() {
   $('tgl2').classList.toggle('hidden', !r); $('sampai').classList.toggle('hidden', !r);
   const t = fmtTgl();
   $('tglTeks').textContent = '📅 ' + (t || 'Pilih tanggal kegiatan');
-  cfg.t1 = $('tgl1').value; cfg.t2 = $('tgl2').value; cfg.r = r; cfg.j = $('judul').value; simpan();
+  siapkanSampul(); cfg.t1 = $('tgl1').value; cfg.t2 = $('tgl2').value; cfg.r = r; cfg.j = $('judul').value; simpan();
 }
 ['tgl1', 'tgl2', 'rentang', 'judul'].forEach(id => $(id).addEventListener('input', updTgl));
 

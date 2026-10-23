@@ -235,9 +235,15 @@ $('btnKirim').onclick = async () => {
     ...S.dok.map((d, i) => new File([d.file], `${(d.name || 'dokumen ' + (i + 1)).trim()}${ext(d.file)}`, { type: d.file.type }))
   ];
 
+  // Salin teks laporan ke clipboard (WhatsApp sering membuang file jika teks ikut dibagikan)
+  let tersalin = true;
+  try { navigator.clipboard.writeText(teks).catch(() => { tersalin = false; }); } catch (_) { tersalin = false; }
+
   try {
     if (navigator.canShare && navigator.canShare({ files })) {
-      await navigator.share({ files, title: judul, text: teks });
+      // Bagikan FILE SAJA (tanpa text/title) supaya foto pasti masuk ke WhatsApp
+      await navigator.share({ files });
+      toast(tersalin ? 'Terkirim. Teks laporan sudah disalin, tempel (paste) di chat WhatsApp.' : 'Terkirim.');
     } else {
       window.open('https://wa.me/?text=' + encodeURIComponent(teks), '_blank');
       toast('Perangkat ini tidak bisa kirim file langsung. Lampirkan file secara manual di WhatsApp.');
